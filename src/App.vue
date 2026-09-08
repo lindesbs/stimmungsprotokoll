@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useMoodStore } from './stores/mood'
 import type { MoodEntry } from './lib/db'
 import { getMoodTag } from './lib/tags'
@@ -52,6 +52,10 @@ const showLowMoodSupport = ref(false)
 const toastMessage = ref('')
 const undoAction = ref<UndoAction | null>(null)
 const importInput = ref<HTMLInputElement | null>(null)
+const menuContainer = ref<HTMLElement | null>(null)
+const menuToggle = ref<HTMLButtonElement | null>(null)
+const entryFormSection = ref<HTMLElement | null>(null)
+const menuOpen = ref(false)
 let reminderTimer: number | undefined
 let toastTimer: number | undefined
 
@@ -64,12 +68,16 @@ onMounted(async () => {
   checkReminder()
   reminderTimer = window.setInterval(checkReminder, 60_000)
   document.addEventListener('visibilitychange', handleVisibilityChange)
+  document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('keydown', handleMenuKeydown)
 })
 
 onBeforeUnmount(() => {
   if (reminderTimer) window.clearInterval(reminderTimer)
   if (toastTimer) window.clearTimeout(toastTimer)
   document.removeEventListener('visibilitychange', handleVisibilityChange)
+  document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('keydown', handleMenuKeydown)
 })
 
 function formatDate(d: Date) {
@@ -108,8 +116,26 @@ function goToday() {
   current.value = today
   selectedDate.value = formatDate(today)
 }
-function openNew(date = selectedDate.value) { view.value = 'day'; selectedDate.value = date; editing.value = null; showForm.value = true }
-function openEdit(entry: MoodEntry) { editing.value = entry; selectedDate.value = entry.date; showForm.value = true }
+async function scrollToEntryForm() {
+  await nextTick()
+  entryFormSection.value?.scrollIntoView({
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    block: 'start'
+  })
+}
+function openNew(date = selectedDate.value) {
+  view.value = 'day'
+  selectedDate.value = date
+  editing.value = null
+  showForm.value = true
+  void scrollToEntryForm()
+}
+function openEdit(entry: MoodEntry) {
+  editing.value = entry
+  selectedDate.value = entry.date
+  showForm.value = true
+  void scrollToEntryForm()
+}
 async function save(entry: MoodEntry) {
   if (saving.value) return
   const previous = editing.value
@@ -197,6 +223,36 @@ function handleVisibilityChange() {
   if (document.visibilityState === 'visible') checkReminder()
 }
 
+function closeMenu() {
+  menuOpen.value = false
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (menuOpen.value && !menuContainer.value?.contains(event.target as Node)) closeMenu()
+}
+
+function handleMenuKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && menuOpen.value) {
+    closeMenu()
+    menuToggle.value?.focus()
+  }
+}
+
+function openImport() {
+  closeMenu()
+  importInput.value?.click()
+}
+
+function exportFromMenu() {
+  closeMenu()
+  exportJson()
+}
+
+function printFromMenu() {
+  closeMenu()
+  printWeek()
+}
+
 function openReminderEntry() {
   const today = new Date()
   current.value = today
@@ -258,13 +314,26 @@ function printWeek() { view.value='week'; setTimeout(() => window.print(), 100) 
 <template>
   <div class="app-shell">
     <header class="app-header">
-      <div><h1>Stimmungsprotokoll</h1><p>Aktivitäten und Stimmung einfach festhalten</p></div>
-      <div class="header-actions no-print">
-        <a class="button ghost" href="#hilfe">Hilfe</a>
-        <button class="ghost" @click="exportJson">Backup</button>
-        <button class="ghost" @click="importInput?.click()">Import</button>
+      <h1>Stimmungsprotokoll</h1>
+      <div ref="menuContainer" class="app-menu no-print">
+        <button
+          ref="menuToggle"
+          class="menu-toggle ghost"
+          type="button"
+          :aria-label="menuOpen ? 'Menü schließen' : 'Menü öffnen'"
+          aria-controls="main-menu"
+          :aria-expanded="menuOpen"
+          @click.stop="menuOpen = !menuOpen"
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
+        <nav v-if="menuOpen" id="main-menu" class="menu-panel" aria-label="Hauptmenü">
+          <a class="menu-item" href="#hilfe" @click="closeMenu">Hilfe</a>
+          <button class="menu-item" type="button" @click="exportFromMenu">Backup erstellen</button>
+          <button class="menu-item" type="button" @click="openImport">Backup importieren</button>
+          <button class="menu-item" type="button" @click="printFromMenu">Drucken / PDF</button>
+        </nav>
         <input ref="importInput" hidden type="file" accept="application/json" @change="importJson" />
-        <button class="ghost" @click="printWeek">Drucken / PDF</button>
       </div>
     </header>
 
@@ -303,7 +372,9 @@ function printWeek() { view.value='week'; setTimeout(() => window.print(), 100) 
           <button class="primary no-print" @click="openNew()">+ Stimmung eintragen</button>
         </section>
 
-        <EntryForm v-if="showForm" :date="selectedDate" :entry="editing" :saving="saving" @save="save" @cancel="showForm=false" />
+        <div v-if="showForm" ref="entryFormSection" class="entry-form-anchor">
+          <EntryForm :date="selectedDate" :entry="editing" :saving="saving" @save="save" @cancel="showForm=false" />
+        </div>
 
         <section v-if="showLowMoodSupport" class="card low-mood-support no-print" role="note">
           <div><strong>Du musst damit nicht allein bleiben.</strong><span>Wenn du möchtest, findest du unten kostenfreie und anonyme Hilfe.</span></div>

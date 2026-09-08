@@ -22,13 +22,14 @@ const ENERGY_CHOICES = [
   { value: 10, label: 'Sehr viel' }
 ] as const
 
-function currentTime() {
+function currentQuarterHour() {
   const now = new Date()
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const minutes = Math.floor(now.getMinutes() / 15) * 15
+  return `${String(now.getHours()).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
 const empty = (): MoodEntry => {
-  const time = currentTime()
+  const time = currentQuarterHour()
   return {
     date: props.date,
     startTime: time,
@@ -141,8 +142,8 @@ const selectedEnergyChoice = computed(() => {
       <summary>Details hinzufügen <span>Optional</span></summary>
       <div class="details-content">
         <div class="form-grid two">
-          <label>Von<input v-model="form.startTime" type="time" required /></label>
-          <label>Bis<input v-model="form.endTime" type="time" required /></label>
+          <label>Von<input v-model="form.startTime" type="time" step="900" required /></label>
+          <label>Bis<input v-model="form.endTime" type="time" step="900" required /></label>
         </div>
         <label>Aktivität<input v-model="form.activity" maxlength="180" placeholder="z. B. Spaziergang oder Arbeit" /></label>
         <label>Stimmung genauer einstellen: <strong>{{ form.mood }}/10 {{ emoji }}</strong>
