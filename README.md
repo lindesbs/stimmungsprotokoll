@@ -121,7 +121,15 @@ Caddy stellt bei korrekt eingerichteter Domain automatisch HTTPS bereit.
 
 ### GitHub Pages
 
-GitHub Pages ist grundsätzlich möglich. Bei Veröffentlichung unter einem Unterpfad wie `name.github.io/projekt/` müssen jedoch Vite-Basispfad, Manifest, Start-URL und Icon-Pfade angepasst werden. Eine eigene Domain oder Bereitstellung direkt am Domain-Stamm ist für diese PWA weniger fehleranfällig.
+GitHub Pages ist für dieses Repository vollständig vorbereitet. Der Workflow [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) baut und veröffentlicht die PWA automatisch nach jedem Push auf `main`. Er setzt beim Build den benötigten Repository-Unterpfad; Manifest, Service Worker, Icons und statische Dateien verwenden dadurch dieselbe Basisadresse.
+
+Einmalig muss im GitHub-Repository unter **Settings → Pages → Build and deployment → Source** die Option **GitHub Actions** gewählt werden. Danach ist die Anwendung unter folgender Adresse erreichbar:
+
+```text
+https://lindesbs.github.io/stimmungsprotokoll/
+```
+
+Der Workflow kann außerdem unter **Actions → Deploy PWA to GitHub Pages → Run workflow** manuell gestartet werden. Der Build verwendet ausschließlich die im Repository enthaltenen Dateien und benötigt keine Secrets.
 
 ### App Stores und verwaltete Geräte
 
