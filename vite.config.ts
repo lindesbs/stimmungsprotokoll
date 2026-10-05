@@ -1,6 +1,23 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+function buildCommit(): string {
+  if (/^[a-f0-9]{40}$/i.test(process.env.GITHUB_SHA ?? '')) return process.env.GITHUB_SHA!.slice(0, 7)
+  try {
+    return execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], {
+      cwd: fileURLToPath(new URL('.', import.meta.url)),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim()
+  } catch {
+    return 'lokaler Build'
+  }
+}
 
 const configuredBase = process.env.BASE_PATH ?? '/'
 const base = configuredBase === '/'
@@ -10,6 +27,10 @@ const assetUrl = (file: string) => `${base}${file}`
 
 export default defineConfig({
   base,
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+    __APP_COMMIT__: JSON.stringify(buildCommit())
+  },
   plugins: [
     vue(),
     VitePWA({

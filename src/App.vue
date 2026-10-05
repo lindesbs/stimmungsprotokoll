@@ -14,6 +14,8 @@ import EntryExplorer from './components/EntryExplorer.vue'
 
 const REMINDER_KEY = 'stimmungsprotokoll-reminder'
 const BACKUP_KEY = 'stimmungsprotokoll-last-backup'
+const appVersion = __APP_VERSION__
+const appCommit = __APP_COMMIT__
 
 interface ReminderPreferences {
   enabled: boolean
@@ -459,9 +461,25 @@ async function clearAllEntries() {
       </section>
     </main>
 
+    <footer class="app-footer no-print">
+      <small>Stefan Lindecke :: <a href="mailto:github.com@chektrion.de">github.com@chektrion.de</a> :: v{{ appVersion }} · {{ appCommit }}</small>
+    </footer>
+
     <div v-if="toastMessage" class="save-toast no-print" role="status" aria-live="polite">
       <span>{{ toastMessage }}</span>
       <button v-if="undoAction" @click="undoLastSave">Rückgängig</button>
     </div>
   </div>
 </template>
+
+<style scoped>
+.app-footer {
+  margin-top: 24px;
+  padding: 12px 0;
+  text-align: center;
+  color: #66727f;
+  overflow-wrap: anywhere;
+}
+.app-footer small { font-size: .75rem; }
+.app-footer a { color: inherit; }
+</style>
