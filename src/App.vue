@@ -2,12 +2,15 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useMoodStore } from './stores/mood'
 import type { MoodEntry } from './lib/db'
+import { isBackupEntry } from './lib/backup'
 import { getMoodTag } from './lib/tags'
 import AppSettings from './components/AppSettings.vue'
 import EntryForm from './components/EntryForm.vue'
 import MoodChart from './components/MoodChart.vue'
 import TagInsights from './components/TagInsights.vue'
 import WeekGrid from './components/WeekGrid.vue'
+import MonthOverview from './components/MonthOverview.vue'
+import EntryExplorer from './components/EntryExplorer.vue'
 
 const REMINDER_KEY = 'stimmungsprotokoll-reminder'
 const BACKUP_KEY = 'stimmungsprotokoll-last-backup'
@@ -41,7 +44,10 @@ const selectedDate = ref(formatDate(new Date()))
 const editing = ref<MoodEntry | null>(null)
 const showForm = ref(false)
 const saving = ref(false)
-const view = ref<'day'|'week'>('day')
+const view = ref<'day'|'week'|'month'|'explore'>('day')
+const exportFrom = ref('')
+const exportTo = ref('')
+const explorerKey = ref(0)
 const reminderPreferences = loadReminderPreferences()
 const reminderEnabled = ref(reminderPreferences.enabled)
 const reminderTime = ref(reminderPreferences.time)
@@ -111,6 +117,32 @@ function moveWeek(offset: number) {
   current.value = addDays(current.value, offset*7)
   selectedDate.value = formatDate(weekStart.value)
 }
+function movePeriod(offset: number) {
+  if (view.value === 'month') {
+    current.value = new Date(current.value.getFullYear(), current.value.getMonth() + offset, 1)
+    selectedDate.value = formatDate(current.value)
+  } else moveWeek(offset)
+}
+function selectMonthDay(date: string) {
+  current.value = parseDate(date)
+  selectedDate.value = date
+  showForm.value = false
+  view.value = 'day'
+}
+function openExplorer(useCurrentPeriod = false) {
+  closeMenu()
+  if (useCurrentPeriod) {
+    const from = view.value === 'month' ? new Date(current.value.getFullYear(), current.value.getMonth(), 1) : weekStart.value
+    const to = view.value === 'month' ? new Date(current.value.getFullYear(), current.value.getMonth() + 1, 0) : addDays(weekStart.value, 6)
+    exportFrom.value = formatDate(from)
+    exportTo.value = formatDate(to)
+  } else {
+    exportFrom.value = ''
+    exportTo.value = ''
+  }
+  explorerKey.value++
+  view.value = 'explore'
+}
 function goToday() {
   const today = new Date()
   current.value = today
@@ -131,6 +163,8 @@ function openNew(date = selectedDate.value) {
   void scrollToEntryForm()
 }
 function openEdit(entry: MoodEntry) {
+  view.value = 'day'
+  current.value = parseDate(entry.date)
   editing.value = entry
   selectedDate.value = entry.date
   showForm.value = true
@@ -249,8 +283,7 @@ function exportFromMenu() {
 }
 
 function printFromMenu() {
-  closeMenu()
-  printWeek()
+  openExplorer(true)
 }
 
 function openReminderEntry() {
@@ -266,21 +299,6 @@ function exportJson() {
   lastBackup.value = new Date().toISOString()
   localStorage.setItem(BACKUP_KEY, lastBackup.value)
   showToast('Backup wurde erstellt.')
-}
-function isBackupEntry(value: unknown): value is MoodEntry {
-  if (!value || typeof value !== 'object') return false
-  const entry = value as Record<string, unknown>
-  return typeof entry.date === 'string'
-    && typeof entry.startTime === 'string'
-    && typeof entry.endTime === 'string'
-    && typeof entry.activity === 'string'
-    && typeof entry.mood === 'number'
-    && entry.mood >= 1
-    && entry.mood <= 10
-    && (entry.energy === undefined || (typeof entry.energy === 'number' && entry.energy >= 1 && entry.energy <= 10))
-    && typeof entry.notes === 'string'
-    && typeof entry.createdAt === 'string'
-    && typeof entry.updatedAt === 'string'
 }
 function importJson(e: Event) {
   const input = e.target as HTMLInputElement; const file = input.files?.[0]; if (!file) return
@@ -308,11 +326,10 @@ async function clearAllEntries() {
   editing.value = null
   showToast('Alle Einträge wurden gelöscht.')
 }
-function printWeek() { view.value='week'; setTimeout(() => window.print(), 100) }
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'report-active': view === 'explore' }">
     <header class="app-header">
       <h1>Stimmungsprotokoll</h1>
       <div ref="menuContainer" class="app-menu no-print">
@@ -332,6 +349,7 @@ function printWeek() { view.value='week'; setTimeout(() => window.print(), 100) 
           <button class="menu-item" type="button" @click="exportFromMenu">Backup erstellen</button>
           <button class="menu-item" type="button" @click="openImport">Backup importieren</button>
           <button class="menu-item" type="button" @click="printFromMenu">Drucken / PDF</button>
+          <button class="menu-item" type="button" @click="openExplorer()">CSV exportieren</button>
         </nav>
         <input ref="importInput" hidden type="file" accept="application/json" @change="importJson" />
       </div>
@@ -351,15 +369,17 @@ function printWeek() { view.value='week'; setTimeout(() => window.print(), 100) 
         <button class="ghost" @click="exportJson">Backup erstellen</button>
       </section>
 
-      <section class="week-nav card no-print">
-        <button aria-label="Vorherige Woche" @click="moveWeek(-1)">‹</button>
-        <div><strong>{{ weekLabel }}</strong><small>Wochenmittel: {{ weekAverage ? weekAverage.toFixed(1) + '/10' : '–' }}</small><button class="today-link" @click="goToday">Heute</button></div>
-        <button aria-label="Nächste Woche" @click="moveWeek(1)">›</button>
+      <section v-if="view !== 'explore'" class="week-nav card no-print">
+        <button :aria-label="view === 'month' ? 'Vorheriger Monat' : 'Vorherige Woche'" @click="movePeriod(-1)">‹</button>
+        <div><strong>{{ view === 'month' ? deDate(current, {month:'long', year:'numeric'}) : weekLabel }}</strong><small v-if="view !== 'month'">Wochenmittel: {{ weekAverage ? weekAverage.toFixed(1) + '/10' : '–' }}</small><button class="today-link" @click="goToday">Heute</button></div>
+        <button :aria-label="view === 'month' ? 'Nächster Monat' : 'Nächste Woche'" @click="movePeriod(1)">›</button>
       </section>
 
       <nav class="tabs no-print">
         <button :class="{active:view==='day'}" :aria-pressed="view==='day'" @click="view='day'">Tagesansicht</button>
         <button :class="{active:view==='week'}" :aria-pressed="view==='week'" @click="view='week'">Wochenplan</button>
+        <button :class="{active:view==='month'}" :aria-pressed="view==='month'" @click="view='month'">Monat</button>
+        <button :class="{active:view==='explore'}" :aria-pressed="view==='explore'" @click="openExplorer()">Suche &amp; Export</button>
       </nav>
 
       <template v-if="view==='day'">
@@ -405,10 +425,13 @@ function printWeek() { view.value='week'; setTimeout(() => window.print(), 100) 
         <MoodChart :entries="weekEntries" />
       </template>
 
-      <template v-else>
+      <template v-else-if="view==='week'">
         <section class="print-title"><h2>Wochenplan Stimmungsprotokoll</h2><p>{{ weekLabel }}</p></section>
         <WeekGrid :days="weekDays" :entries="weekEntries" />
       </template>
+
+      <MonthOverview v-else-if="view==='month'" :month="current" :entries="store.entries" @select="selectMonthDay" />
+      <EntryExplorer v-else :key="explorerKey" :entries="store.entries" :initial-from="exportFrom" :initial-to="exportTo" @edit="openEdit" />
 
       <TagInsights :week-entries="weekEntries" :all-entries="store.entries" />
 

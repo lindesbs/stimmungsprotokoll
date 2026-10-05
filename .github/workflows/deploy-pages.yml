@@ -35,6 +35,15 @@ jobs:
         env:
           BASE_PATH: "/${{ github.event.repository.name }}/"
 
+      - name: Test data and exports
+        run: npm test
+
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Test browser workflows
+        run: npm run test:e2e
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 

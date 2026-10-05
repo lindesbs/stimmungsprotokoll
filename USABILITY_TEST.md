@@ -17,6 +17,10 @@ Ziel: Ein einfacher Stimmungseintrag soll ohne Erklärung in höchstens zehn Sek
 4. Die Erinnerung auf eine gewünschte Uhrzeit einstellen.
 5. Ein Backup erstellen und die Hinweise zum Datenschutz finden.
 6. Die Krisenhilfe finden, ohne dass vorher eine schlechte Stimmung eingetragen wird.
+7. In der Monatsübersicht den vorherigen Monat und einen Tag mit Einträgen öffnen.
+8. In **Suche & Export** nach einer Kategorie und einem Zeitraum filtern; anschließend die Filter zurücksetzen.
+9. Einen PDF-Bericht über mehrere Wochen zunächst ohne, dann mit persönlichen Notizen speichern. In beiden Dateien Zeitraum, Diagramm, Tabelleninhalt und Seitenumbrüche prüfen.
+10. Dieselbe Auswahl als CSV herunterladen und in Excel oder LibreOffice öffnen. Umlaute, mehrzeilige Notizen und Spaltenzuordnung prüfen.
 
 ## Beobachten
 
